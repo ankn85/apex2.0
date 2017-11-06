@@ -1,48 +1,45 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using AutoMapper;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Apex.Websites.Data;
-using Apex.Websites.Services;
+using Newtonsoft.Json.Serialization;
+using Newtonsoft.Json;
+using System;
 
 namespace Apex.Websites
 {
     public class Startup
     {
+        private readonly string _connectionString;
+        private readonly IConfiguration _configuration;
+
         public Startup(IConfiguration configuration)
         {
-            Configuration = configuration;
+            _configuration = configuration;
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        public IConfiguration Configuration { get; }
-
         // This method gets called by the runtime. Use this method to add services to the container.
-        public void ConfigureServices(IServiceCollection services)
+        public IServiceProvider ConfigureServices(IServiceCollection services)
         {
-            services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
-
-            services.AddIdentity<ApplicationUser, IdentityRole>()
-                .AddEntityFrameworkStores<ApplicationDbContext>()
-                .AddDefaultTokenProviders();
-
-            services.AddMvc()
-                .AddRazorPagesOptions(options =>
+            services
+                .AddCustomIdentity(_connectionString)
+                .AddMemoryCache()
+                .AddDistributedMemoryCache()
+                .AddAutoMapper()
+                .AddMvc()
+                .AddJsonOptions(opts =>
                 {
-                    options.Conventions.AuthorizeFolder("/Account/Manage");
-                    options.Conventions.AuthorizePage("/Account/Logout");
+                    var serializerSettings = opts.SerializerSettings;
+
+                    serializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+                    serializerSettings.Formatting = Formatting.None;
+                    serializerSettings.NullValueHandling = NullValueHandling.Ignore;
+                    serializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
                 });
 
-            // Register no-op EmailSender used by account confirmation and password reset during development
-            // For more information on how to enable account confirmation and password reset please visit https://go.microsoft.com/fwlink/?LinkID=532713
-            services.AddSingleton<IEmailSender, EmailSender>();
+            return services.AddInternalServices();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -51,24 +48,16 @@ namespace Apex.Websites
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
-                app.UseBrowserLink();
-                app.UseDatabaseErrorPage();
             }
             else
             {
-                app.UseExceptionHandler("/Error");
+                app.UseExceptionHandler("/Home/Error");
             }
 
-            app.UseStaticFiles();
-
-            app.UseAuthentication();
-
-            app.UseMvc(routes =>
-            {
-                routes.MapRoute(
-                    name: "default",
-                    template: "{controller}/{action=Index}/{id?}");
-            });
+            app.UseStaticFiles()
+                .UseAuthentication()
+                .UseCustomMvc()
+                .InitDefaultData();
         }
     }
 }

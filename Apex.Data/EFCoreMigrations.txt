@@ -1,0 +1,8 @@
+﻿» Apex.Data
+- Add: <DotNetCliToolReference Include="Microsoft.EntityFrameworkCore.Tools.DotNet" Version="2.0.0" />
+- Open CLI:
+
+dotnet ef --startup-project ../Apex.Websites/ migrations add Initialize
+dotnet ef --startup-project ../Apex.Websites/ migrations remove
+
+dotnet ef --startup-project ../Apex.Websites/ database update
